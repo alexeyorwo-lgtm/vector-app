@@ -3,11 +3,12 @@ import cv2
 import zipfile
 import threading
 import tempfile
+import numpy as np
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import vtracer
 
-# Настройка премиум-дизайна (Темная тема, акценты)
+# Настройка премиум-дизайна
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -25,16 +26,13 @@ class VTracerDesignerApp(ctk.CTk):
         self.build_ui()
 
     def build_ui(self):
-        # --- ЛЕВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ---
         self.sidebar = ctk.CTkScrollableFrame(self, width=500, corner_radius=0)
         self.sidebar.pack(side="left", fill="y", padx=0, pady=0)
 
         self.add_section_header("1. ПОДГОТОВКА ИЗОБРАЖЕНИЯ")
-        
         self.bw_var = ctk.BooleanVar(value=True)
         ctk.CTkSwitch(self.sidebar, text="Истинный ЧБ (Сохраняет оригинальные тени)", variable=self.bw_var, font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
         ctk.CTkLabel(self.sidebar, text="Переводит фото в идеальный монохром перед векторизацией.", text_color="gray", font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20, pady=(0, 10))
-
         self.add_slider("Умное сглаживание (Denoise)", "0 = Откл. Убирает пиксельный шум JPEG, не размывая края объектов.", "blur", 0, 15, 5, is_int=True)
 
         self.add_section_header("2. НАРЕЗКА ИСХОДНИКА (СЕТКА)")
@@ -42,29 +40,12 @@ class VTracerDesignerApp(ctk.CTk):
         self.add_slider("Разрезка по вертикали (Столбцы)", "Сколько частей будет по ширине. Итог: 2х3 = 6 файлов.", "cols", 1, 10, 3, is_int=True)
 
         self.add_section_header("3. ДВИЖОК ВЕКТОРИЗАЦИИ (ПРЕДЕЛ)")
-        
-        self.add_slider("Детализация микро-теней (Layer Diff)", 
-                        "1 = ЭКСТРИМ. Каждый мельчайший оттенок создаст новый слой.\n16 = Плакатный эффект (мало цветов).", 
-                        "layer_diff", 1, 32, 1, is_int=True)
-        
-        self.add_slider("Игнорирование пылинок (Speckle)", 
-                        "0 = ЭКСТРИМ. Векторизатор обрисует даже точки размером в 1 пиксель.\n4+ = Чистый логотип без мусора.", 
-                        "speckle", 0, 10, 0, is_int=True)
-        
-        self.add_slider("Точность изгиба кривых (Iterations)", 
-                        "50 = ЭКСТРИМ. Процессор потратит в 5 раз больше времени на \nидеальное прилегание кривой к пикселю.", 
-                        "iterations", 10, 100, 50, is_int=True)
-        
-        self.add_slider("Отрисовка микро-линий (Length)", 
-                        "0.1 = ЭКСТРИМ. Захватывает черточки длиной в десятую долю пикселя.", 
-                        "length", 0.1, 5.0, 0.1, is_int=False)
-        
-        self.add_slider("Острота углов (Corner Threshold)", 
-                        "30 = ЭКСТРИМ. Углы остаются острыми.\n90 = Все углы сглаживаются в круглые формы.", 
-                        "corner", 10, 90, 30, is_int=True)
+        self.add_slider("Детализация микро-теней (Layer Diff)", "1 = ЭКСТРИМ. Каждый мельчайший оттенок создаст новый слой.\n16 = Плакатный эффект (мало цветов).", "layer_diff", 1, 32, 1, is_int=True)
+        self.add_slider("Игнорирование пылинок (Speckle)", "0 = ЭКСТРИМ. Векторизатор обрисует даже точки размером в 1 пиксель.\n4+ = Чистый логотип без мусора.", "speckle", 0, 10, 0, is_int=True)
+        self.add_slider("Точность изгиба кривых (Iterations)", "50 = ЭКСТРИМ. Процессор потратит в 5 раз больше времени на \nидеальное прилегание кривой к пикселю.", "iterations", 10, 100, 50, is_int=True)
+        self.add_slider("Отрисовка микро-линий (Length)", "0.1 = ЭКСТРИМ. Захватывает черточки длиной в десятую долю пикселя.", "length", 0.1, 5.0, 0.1, is_int=False)
+        self.add_slider("Острота углов (Corner Threshold)", "30 = ЭКСТРИМ. Углы остаются острыми.\n90 = Все углы сглаживаются в круглые формы.", "corner", 10, 90, 30, is_int=True)
 
-
-        # --- ПРАВАЯ ПАНЕЛЬ (КНОПКИ И ЛОГ) ---
         self.main_view = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.main_view.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 
@@ -80,7 +61,6 @@ class VTracerDesignerApp(ctk.CTk):
         self.log_box = ctk.CTkTextbox(self.main_view, font=ctk.CTkFont(family="Courier", size=13), state="disabled")
         self.log_box.pack(fill="both", expand=True, pady=(20, 0))
 
-    # --- Элементы UI ---
     def add_section_header(self, title):
         ctk.CTkLabel(self.sidebar, text=title, font=ctk.CTkFont(size=16, weight="bold"), text_color="#3399ff").pack(anchor="w", padx=20, pady=(25, 10))
 
@@ -114,7 +94,6 @@ class VTracerDesignerApp(ctk.CTk):
         val = getattr(self, f"slider_{name}").get()
         return int(val) if getattr(self, f"is_int_{name}") else float(val)
 
-    # --- Логика ---
     def log(self, text):
         self.log_box.configure(state="normal")
         self.log_box.insert("end", text + "\n")
@@ -138,9 +117,24 @@ class VTracerDesignerApp(ctk.CTk):
         self.log("\n[СТАРТ] Вычисления запущены...")
         threading.Thread(target=self.process, daemon=True).start()
 
+    # ВАЖНО: Функция безопасного чтения файлов с русскими названиями
+    def imread_unicode(self, path):
+        stream = open(path, "rb")
+        bytes_array = bytearray(stream.read())
+        numpy_array = np.asarray(bytes_array, dtype=np.uint8)
+        return cv2.imdecode(numpy_array, cv2.IMREAD_COLOR)
+
+    # ВАЖНО: Функция безопасного сохранения файлов
+    def imwrite_unicode(self, path, img_array):
+        is_success, im_buf_arr = cv2.imencode(".png", img_array)
+        im_buf_arr.tofile(path)
+
     def process(self):
         try:
-            img = cv2.imread(self.input_file)
+            # Используем безопасное чтение
+            img = self.imread_unicode(self.input_file)
+            if img is None:
+                raise Exception("Не удалось прочитать изображение. Проверьте целостность файла.")
             
             if self.bw_var.get():
                 self.log(">> Применяю Истинный ЧБ (сохранение светотени)...")
@@ -170,7 +164,8 @@ class VTracerDesignerApp(ctk.CTk):
                         tmp_png = os.path.join(tmpdir, f"chunk_{num}.png")
                         tmp_svg = os.path.join(tmpdir, f"part_{num}.svg")
                         
-                        cv2.imwrite(tmp_png, chunk)
+                        # Используем безопасное сохранение куска
+                        self.imwrite_unicode(tmp_png, chunk)
                         self.log(f"   -> Высчитываю сплайны для куска {num} из {rows*cols}...")
                         
                         vtracer.convert_image_to_svg_py(
@@ -204,4 +199,3 @@ class VTracerDesignerApp(ctk.CTk):
 if __name__ == "__main__":
     app = VTracerDesignerApp()
     app.mainloop()
-
