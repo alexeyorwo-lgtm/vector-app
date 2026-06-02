@@ -6,13 +6,13 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2019
+    runs-on: windows-latest  # Берем самый быстрый и доступный сервер
 
     steps:
     - name: Получаем файлы
       uses: actions/checkout@v4
 
-    - name: Устанавливаем Python 3.8 (ИДЕАЛЬНО ДЛЯ WINDOWS 7)
+    - name: Устанавливаем Python 3.8 (Для Windows 7)
       uses: actions/setup-python@v5
       with:
         python-version: '3.8'
@@ -21,7 +21,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
+        pip install pyinstaller==5.13.2  # ВАЖНО: берем старый упаковщик для поддержки Win 7
 
     - name: Собираем EXE файл
       run: pyinstaller --noconsole --onefile app.py
@@ -31,3 +31,4 @@ jobs:
       with:
         name: VectorMaster-Win7-Edition
         path: dist/app.exe
+
