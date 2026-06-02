@@ -31,14 +31,13 @@ class VTracerDesignerApp(ctk.CTk):
 
         self.add_section_header("1. ПОДГОТОВКА И ЦВЕТ")
         
-        # НОВОЕ: Переключатель Цвета и ЧБ
         self.color_mode_var = ctk.StringVar(value="Цветное (Оригинал)")
         self.seg_color = ctk.CTkSegmentedButton(self.sidebar, values=["Цветное (Оригинал)", "Истинный ЧБ"], variable=self.color_mode_var, font=ctk.CTkFont(weight="bold"))
         self.seg_color.pack(fill="x", padx=20, pady=(10, 5))
         
         ctk.CTkLabel(self.sidebar, text="В цвете программа сохранит оригинальные оттенки.\nВ ЧБ — переведет фото в монохром.", text_color="gray", font=ctk.CTkFont(size=11), justify="left").pack(anchor="w", padx=20, pady=(0, 10))
         
-        self.add_slider("Умное сглаживание (Denoise)", "0 = Откл. Убирает пиксельный шум JPEG, не размывая края объектов.", "blur", 0, 15, 5, is_int=True)
+        self.add_slider("Умное сглаживание (Denoise)", "0 = Откл. Убирает пиксельный шум, не размывая края объектов.", "blur", 0, 15, 5, is_int=True)
 
         self.add_section_header("2. НАРЕЗКА ИСХОДНИКА (СЕТКА)")
         self.add_slider("Разрезка по горизонтали (Строки)", "Сколько частей будет по высоте.", "rows", 1, 10, 2, is_int=True)
@@ -54,7 +53,8 @@ class VTracerDesignerApp(ctk.CTk):
         self.main_view = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.main_view.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 
-        self.btn_select = ctk.CTkButton(self.main_view, text="📂 ВЫБРАТЬ JPEG / JPG", font=ctk.CTkFont(size=16, weight="bold"), command=self.select_file, height=60)
+        # НОВОЕ: Изменили текст кнопки
+        self.btn_select = ctk.CTkButton(self.main_view, text="📂 ВЫБРАТЬ JPEG / PNG", font=ctk.CTkFont(size=16, weight="bold"), command=self.select_file, height=60)
         self.btn_select.pack(fill="x", pady=(0, 10))
 
         self.lbl_file = ctk.CTkLabel(self.main_view, text="Файл не выбран", text_color="gray", font=ctk.CTkFont(size=14))
@@ -106,7 +106,8 @@ class VTracerDesignerApp(ctk.CTk):
         self.log_box.configure(state="disabled")
 
     def select_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("JPEG", "*.jpg;*.jpeg")])
+        # НОВОЕ: Разрешили выбор файлов PNG
+        file_path = filedialog.askopenfilename(filetypes=[("Images", "*.jpg;*.jpeg;*.png")])
         if file_path:
             self.input_file = file_path
             self.lbl_file.configure(text=os.path.basename(file_path), text_color="white")
@@ -122,11 +123,29 @@ class VTracerDesignerApp(ctk.CTk):
         self.log("\n[СТАРТ] Вычисления запущены...")
         threading.Thread(target=self.process, daemon=True).start()
 
+    # НОВОЕ: Умное чтение изображений (с поддержкой прозрачного фона PNG)
     def imread_unicode(self, path):
         stream = open(path, "rb")
         bytes_array = bytearray(stream.read())
         numpy_array = np.asarray(bytes_array, dtype=np.uint8)
-        return cv2.imdecode(numpy_array, cv2.IMREAD_COLOR)
+        
+        # Читаем картинку, сохраняя альфа-канал (если он есть)
+        img = cv2.imdecode(numpy_array, cv2.IMREAD_UNCHANGED)
+        
+        if img is not None:
+            # Если картинка имеет 4 канала (Прозрачный PNG)
+            if len(img.shape) == 3 and img.shape[2] == 4:
+                alpha_channel = img[:, :, 3] / 255.0
+                rgb_channels = img[:, :, :3]
+                # Создаем белый фон
+                white_background = np.ones_like(rgb_channels, dtype=np.uint8) * 255
+                # Смешиваем (подкладываем белый холст)
+                img = (rgb_channels * alpha_channel[..., np.newaxis] + white_background * (1 - alpha_channel[..., np.newaxis])).astype(np.uint8)
+            # Если картинка ЧБ изначально
+            elif len(img.shape) == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                
+        return img
 
     def imwrite_unicode(self, path, img_array):
         is_success, im_buf_arr = cv2.imencode(".png", img_array)
@@ -138,7 +157,6 @@ class VTracerDesignerApp(ctk.CTk):
             if img is None:
                 raise Exception("Не удалось прочитать изображение. Проверьте файл.")
             
-            # НОВОЕ: Обработка цвета
             if self.color_mode_var.get() == "Истинный ЧБ":
                 self.log(">> Режим: ЧЕРНО-БЕЛОЕ (монохром)...")
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
