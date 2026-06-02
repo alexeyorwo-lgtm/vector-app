@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows 7 EXE
 
 on:
   push:
@@ -6,16 +6,16 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2019
 
     steps:
     - name: Получаем файлы
       uses: actions/checkout@v4
 
-    - name: Устанавливаем Python
+    - name: Устанавливаем Python 3.9 (Для Windows 7)
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.9'
 
     - name: Устанавливаем библиотеки
       run: |
@@ -29,5 +29,5 @@ jobs:
     - name: Сохраняем готовый файл
       uses: actions/upload-artifact@v4
       with:
-        name: VectorMaster-App-Windows
+        name: VectorMaster-Win7-Edition
         path: dist/app.exe
