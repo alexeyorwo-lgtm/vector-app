@@ -12,10 +12,10 @@ jobs:
     - name: Получаем файлы
       uses: actions/checkout@v4
 
-    - name: Устанавливаем Python 3.9 (Для Windows 7)
+    - name: Устанавливаем Python 3.8 (ИДЕАЛЬНО ДЛЯ WINDOWS 7)
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.8'
 
     - name: Устанавливаем библиотеки
       run: |
