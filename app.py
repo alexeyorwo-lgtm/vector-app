@@ -16,7 +16,7 @@ class VTracerDesignerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("VectorMaster Pro | Extreme Edition")
+        self.title("VectorMaster Pro | Win7 & Color Edition")
         self.geometry("950x850")
         self.minsize(900, 800)
 
@@ -29,10 +29,15 @@ class VTracerDesignerApp(ctk.CTk):
         self.sidebar = ctk.CTkScrollableFrame(self, width=500, corner_radius=0)
         self.sidebar.pack(side="left", fill="y", padx=0, pady=0)
 
-        self.add_section_header("1. ПОДГОТОВКА ИЗОБРАЖЕНИЯ")
-        self.bw_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(self.sidebar, text="Истинный ЧБ (Сохраняет оригинальные тени)", variable=self.bw_var, font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        ctk.CTkLabel(self.sidebar, text="Переводит фото в идеальный монохром перед векторизацией.", text_color="gray", font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20, pady=(0, 10))
+        self.add_section_header("1. ПОДГОТОВКА И ЦВЕТ")
+        
+        # НОВОЕ: Переключатель Цвета и ЧБ
+        self.color_mode_var = ctk.StringVar(value="Цветное (Оригинал)")
+        self.seg_color = ctk.CTkSegmentedButton(self.sidebar, values=["Цветное (Оригинал)", "Истинный ЧБ"], variable=self.color_mode_var, font=ctk.CTkFont(weight="bold"))
+        self.seg_color.pack(fill="x", padx=20, pady=(10, 5))
+        
+        ctk.CTkLabel(self.sidebar, text="В цвете программа сохранит оригинальные оттенки.\nВ ЧБ — переведет фото в монохром.", text_color="gray", font=ctk.CTkFont(size=11), justify="left").pack(anchor="w", padx=20, pady=(0, 10))
+        
         self.add_slider("Умное сглаживание (Denoise)", "0 = Откл. Убирает пиксельный шум JPEG, не размывая края объектов.", "blur", 0, 15, 5, is_int=True)
 
         self.add_section_header("2. НАРЕЗКА ИСХОДНИКА (СЕТКА)")
@@ -40,7 +45,7 @@ class VTracerDesignerApp(ctk.CTk):
         self.add_slider("Разрезка по вертикали (Столбцы)", "Сколько частей будет по ширине. Итог: 2х3 = 6 файлов.", "cols", 1, 10, 3, is_int=True)
 
         self.add_section_header("3. ДВИЖОК ВЕКТОРИЗАЦИИ (ПРЕДЕЛ)")
-        self.add_slider("Детализация микро-теней (Layer Diff)", "1 = ЭКСТРИМ. Каждый мельчайший оттенок создаст новый слой.\n16 = Плакатный эффект (мало цветов).", "layer_diff", 1, 32, 1, is_int=True)
+        self.add_slider("Детализация оттенков (Layer Diff)", "1 = ЭКСТРИМ. Каждый мельчайший оттенок цвета создаст новый слой.\n16 = Плакатный эффект (мало цветов).", "layer_diff", 1, 32, 1, is_int=True)
         self.add_slider("Игнорирование пылинок (Speckle)", "0 = ЭКСТРИМ. Векторизатор обрисует даже точки размером в 1 пиксель.\n4+ = Чистый логотип без мусора.", "speckle", 0, 10, 0, is_int=True)
         self.add_slider("Точность изгиба кривых (Iterations)", "50 = ЭКСТРИМ. Процессор потратит в 5 раз больше времени на \nидеальное прилегание кривой к пикселю.", "iterations", 10, 100, 50, is_int=True)
         self.add_slider("Отрисовка микро-линий (Length)", "0.1 = ЭКСТРИМ. Захватывает черточки длиной в десятую долю пикселя.", "length", 0.1, 5.0, 0.1, is_int=False)
@@ -117,29 +122,29 @@ class VTracerDesignerApp(ctk.CTk):
         self.log("\n[СТАРТ] Вычисления запущены...")
         threading.Thread(target=self.process, daemon=True).start()
 
-    # ВАЖНО: Функция безопасного чтения файлов с русскими названиями
     def imread_unicode(self, path):
         stream = open(path, "rb")
         bytes_array = bytearray(stream.read())
         numpy_array = np.asarray(bytes_array, dtype=np.uint8)
         return cv2.imdecode(numpy_array, cv2.IMREAD_COLOR)
 
-    # ВАЖНО: Функция безопасного сохранения файлов
     def imwrite_unicode(self, path, img_array):
         is_success, im_buf_arr = cv2.imencode(".png", img_array)
         im_buf_arr.tofile(path)
 
     def process(self):
         try:
-            # Используем безопасное чтение
             img = self.imread_unicode(self.input_file)
             if img is None:
-                raise Exception("Не удалось прочитать изображение. Проверьте целостность файла.")
+                raise Exception("Не удалось прочитать изображение. Проверьте файл.")
             
-            if self.bw_var.get():
-                self.log(">> Применяю Истинный ЧБ (сохранение светотени)...")
+            # НОВОЕ: Обработка цвета
+            if self.color_mode_var.get() == "Истинный ЧБ":
+                self.log(">> Режим: ЧЕРНО-БЕЛОЕ (монохром)...")
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            else:
+                self.log(">> Режим: ЦВЕТНОЕ (сохранение оригинальных цветов)...")
 
             blur = self.get_val("blur")
             if blur > 0:
@@ -164,7 +169,6 @@ class VTracerDesignerApp(ctk.CTk):
                         tmp_png = os.path.join(tmpdir, f"chunk_{num}.png")
                         tmp_svg = os.path.join(tmpdir, f"part_{num}.svg")
                         
-                        # Используем безопасное сохранение куска
                         self.imwrite_unicode(tmp_png, chunk)
                         self.log(f"   -> Высчитываю сплайны для куска {num} из {rows*cols}...")
                         
@@ -199,3 +203,4 @@ class VTracerDesignerApp(ctk.CTk):
 if __name__ == "__main__":
     app = VTracerDesignerApp()
     app.mainloop()
+
