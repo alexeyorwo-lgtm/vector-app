@@ -17,17 +17,17 @@ jobs:
       with:
         python-version: '3.8'
 
-    - name: Устанавливаем библиотеки
+    - name: Железобетонная сборка (Изоляция + Старый Pip)
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r requirements.txt
-        python -m pip install pyinstaller==5.13.2
-
-    - name: Собираем EXE файл (СИЛОВОЙ ЗАХВАТ БИНАРНИКОВ)
-      run: python -m PyInstaller --noconsole --onefile --collect-all customtkinter --collect-all cv2 --collect-all numpy --collect-all vtracer app.py
+        python -m venv venv
+        .\venv\Scripts\python.exe -m pip install pip==23.3.1
+        .\venv\Scripts\pip.exe install -r requirements.txt
+        .\venv\Scripts\pip.exe install pyinstaller==5.13.2
+        .\venv\Scripts\pyinstaller.exe --noconsole --onefile --collect-all customtkinter --collect-all cv2 --collect-all numpy --collect-all vtracer app.py
 
     - name: Сохраняем готовый файл
       uses: actions/upload-artifact@v4
       with:
         name: VectorMaster-Win7-Edition
         path: dist/app.exe
+
