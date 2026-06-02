@@ -1,5 +1,5 @@
 customtkinter
-opencv-python-headless
+opencv-python-headless<4.6.0
 pillow
 vtracer
 numpy
