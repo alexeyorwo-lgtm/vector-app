@@ -17,19 +17,17 @@ jobs:
       with:
         python-version: '3.8'
 
-    - name: Устанавливаем библиотеки
+    - name: Устанавливаем библиотеки именно в наш Python
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller==5.13.2
+        python -m pip install -r requirements.txt
+        python -m pip install pyinstaller==5.13.2
 
-    - name: Собираем EXE файл (ПРИНУДИТЕЛЬНАЯ ЗАПАКОВКА CV2)
-      run: pyinstaller --noconsole --onefile --hidden-import cv2 app.py
+    - name: Собираем EXE файл (ЖЕЛЕЗОБЕТОННО)
+      run: python -m PyInstaller --noconsole --onefile --hidden-import cv2 --hidden-import numpy --hidden-import vtracer --hidden-import customtkinter app.py
 
     - name: Сохраняем готовый файл
       uses: actions/upload-artifact@v4
       with:
         name: VectorMaster-Win7-Edition
         path: dist/app.exe
-
-
